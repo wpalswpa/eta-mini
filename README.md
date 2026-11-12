@@ -4,8 +4,8 @@
 
 ## 현재 상태
 
-- 된 것: 규칙 예측기, API 두 개(`POST /eta`, `GET /health`), 계약 테스트, 컨테이너 이미지(빌드, 컨테이너 안 테스트, 서버 응답 확인).
-- 안 된 것: CI/CD, 외부 배포, 학습 모델.
+- 된 것: 규칙 예측기, API 두 개(`POST /eta`, `GET /health`), 계약 테스트, 컨테이너 이미지(빌드, 컨테이너 안 테스트, 서버 응답 확인), GitHub Actions 워크플로 파일.
+- 안 된 것: GitHub에서 워크플로 실행 확인, 태그 배포, 외부 배포, 학습 모델.
 
 ## 읽는 순서
 
@@ -22,6 +22,7 @@
 | 의존성 설치 | `uv sync --all-groups` |
 | 개발 서버 | `uv run uvicorn api.app:app --port 8080 --reload` |
 | 테스트 | `uv run pytest -q` |
+| CI와 같은 테스트(잠금 파일 확인 포함) | `uv run --locked pytest -q` |
 | 이미지 빌드 | `docker build -f api/Dockerfile -t eta-api .` |
 | 컨테이너 안에서 테스트 | `docker run --rm eta-api uv run pytest` |
 | 이미지 안 파일 확인 | `docker run --rm eta-api sh -c 'find . \| grep -v .venv'` |
@@ -38,9 +39,12 @@ curl -X POST localhost:8080/eta -H 'Content-Type: application/json' -d '{"distan
 
 개발 서버가 8080을 쓰는 중에 컨테이너를 `--publish 8080:8080`으로 띄우면, 오류 없이 뜨지만 `localhost:8080` 요청은 모두 개발 서버가 받는다. 컨테이너를 확인하려면 개발 서버를 끄거나 `--publish 8090:8080`처럼 다른 포트로 연결한다. `--publish` 없이 띄우면 서버는 컨테이너 안에서만 열리고 Mac에서는 접속할 수 없다.
 
+GitHub에 올리면 `.github/workflows/ci.yml`이 테스트를 돌린다. PR을 열거나 `main`에 push할 때 돌고, 다른 브랜치를 push만 해서는 돌지 않는다. `v`로 시작하는 태그를 push하면 테스트 뒤 이미지를 `ghcr.io/wpalswpa/eta-mini/eta-api`에 올린다.
+
 ## 파일 구조
 
 ```text
+.github/workflows/ci.yml  GitHub Actions 테스트와 이미지 배포
 api/
   app.py               API 정의와 입력 검증
   predictors/rule.py   규칙 예측기(이후 모델이 넘어야 할 기준선)
