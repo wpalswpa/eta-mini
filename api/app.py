@@ -14,10 +14,14 @@ estimate_delivery_minutes = importlib.import_module(f"api.predictors.{MODEL_IMPL
 
 class EtaRequest(BaseModel):
     """배달 예상 시간 요청"""
-    # 모델이 더 많은 정보를 원하면 여기에 필드를 추가
+    # 모델이 더 많은 정보를 원하면 여기에 필드를 추가. 모르는 필드는 무시한다(요청 확장 대비).
+    # strict=True: "3"이나 true를 숫자로 바꿔 받지 않는다(true가 1km로 계산되는 것을 막음)
+    # le=20: 배달 가능 거리 20km
     # allow_inf_nan=False: 1e309처럼 무한대가 되는 값을 받으면 minutes가 null로 나간다
-    distance_km: float = Field(ge=0, allow_inf_nan=False, description="가게에서 배달지까지 거리(km)")
-    pending_orders: int = Field(ge=0, description="지금 밀려 있는 주문 수")
+    distance_km: float = Field(
+        ge=0, le=20, allow_inf_nan=False, strict=True, description="가게에서 배달지까지 거리(km)"
+    )
+    pending_orders: int = Field(ge=0, strict=True, description="지금 밀려 있는 주문 수")
 
 class EtaResponse(BaseModel):
     """배달 예상 시간 응답"""
