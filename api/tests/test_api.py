@@ -149,6 +149,47 @@ def test_eta_rejects_non_finite_distance(load_app, body):
     assert ["body", "distance_km"] in error_locations(response)
 
 
+# ---------------------------------------------------------------- 소개 페이지
+
+
+def test_index_page_returns_html_describing_the_api(client):
+    """R14: `/`가 HTML 소개 페이지를 돌려주고, 두 API와 요청 필드, 문서 링크, 지금 예측기 이름을 보여 준다."""
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    page = response.text
+    for text in ["POST /eta", "GET /health", "distance_km", "pending_orders", 'href="/docs"']:
+        assert text in page
+    assert '<code class="model">rule</code>' in page
+
+
+def test_index_page_shows_predictor_chosen_by_model_impl(load_app, monkeypatch):
+    """R14: 소개 페이지의 예측기 이름이 MODEL_IMPL을 따른다."""
+    fake_module = types.ModuleType("api.predictors.fake")
+    setattr(fake_module, "estimate_delivery_minutes", lambda distance_km, pending_orders: 0.0)
+    monkeypatch.setitem(sys.modules, "api.predictors.fake", fake_module)
+    client = TestClient(load_app("fake").app)
+
+    assert '<code class="model">fake</code>' in client.get("/").text
+
+
+def test_index_page_has_no_scripts_or_external_files(client):
+    """R14: 소개 페이지는 자바스크립트와 외부 파일 없이 HTML 하나로 끝난다(설계서 2.3)."""
+    page = client.get("/").text.lower()
+
+    for banned in ["<script", "<link", " src="]:
+        assert banned not in page
+
+
+def test_index_page_is_not_in_api_schema(client):
+    """R14: 소개 페이지는 사람이 읽는 페이지라 API 명세(/openapi.json)에 넣지 않는다."""
+    paths = client.get("/openapi.json").json()["paths"]
+
+    assert "/" not in paths
+    assert {"/eta", "/health"} <= set(paths)
+
+
 # ---------------------------------------------------------------- 상태 확인과 예측기 교체
 
 

@@ -1,16 +1,24 @@
+import html
 import importlib
 import math
 import os
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 MODEL_IMPL = os.getenv("MODEL_IMPL", "rule")
 estimate_delivery_minutes = importlib.import_module(f"api.predictors.{MODEL_IMPL}").estimate_delivery_minutes
+
+# 소개 페이지(설계서 2.3). 바꿔 넣을 값이 예측기 이름 하나라 템플릿 엔진 없이 치환한다.
+INDEX_HTML = (
+    Path(__file__).with_name("index.html").read_text(encoding="utf-8")
+    .replace("{{MODEL_IMPL}}", html.escape(MODEL_IMPL))
+)
 
 class EtaRequest(BaseModel):
     """배달 예상 시간 요청"""
@@ -47,6 +55,11 @@ async def validation_error_handler(_request: Request, exc: RequestValidationErro
     기본 처리기는 오류에 담긴 입력값을 그대로 JSON으로 만들다가 무한대·NaN에서 500을 낸다.
     """
     return JSONResponse(status_code=422, content={"detail": _json_safe(jsonable_encoder(exc.errors()))})
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def index() -> str:
+    """API 소개 페이지(HTML)를 돌려준다. 사람이 읽는 페이지라 API 명세에는 넣지 않는다."""
+    return INDEX_HTML
 
 @app.get("/health")
 def health() -> dict[str, str]:

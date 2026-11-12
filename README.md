@@ -4,7 +4,7 @@
 
 ## 현재 상태
 
-- 된 것: 규칙 예측기, API 두 개(`POST /eta`, `GET /health`), 계약 테스트, 컨테이너 이미지(빌드, 컨테이너 안 테스트, 서버 응답 확인), GitHub Actions 자동 테스트(`main`에 올릴 때 실행, 첫 실행 통과).
+- 된 것: 규칙 예측기, API 두 개(`POST /eta`, `GET /health`), 서버 주소(`/`)의 소개 페이지, 계약 테스트, 컨테이너 이미지(빌드, 컨테이너 안 테스트, 서버 응답 확인), GitHub Actions 자동 테스트(`main`에 올릴 때 실행, 첫 실행 통과).
 - 안 된 것: 태그 배포, 외부 배포, 학습 모델.
 
 ## 읽는 순서
@@ -47,6 +47,7 @@ GitHub에 올리면 `.github/workflows/ci.yml`이 테스트를 돌린다. PR을 
 .github/workflows/ci.yml  GitHub Actions 테스트와 이미지 배포
 api/
   app.py               API 정의와 입력 검증
+  index.html           서버 주소(`/`)의 소개 페이지
   predictors/rule.py   규칙 예측기(이후 모델이 넘어야 할 기준선)
   tests/               계약 테스트(pytest)
   Dockerfile           컨테이너 이미지 정의
