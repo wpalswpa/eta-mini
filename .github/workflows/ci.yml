@@ -17,8 +17,8 @@ jobs:
         with:
           enable-cache: true
       # 모델 학습 및 검증 게이트 (산출물 artifacts/ 생성 후 테스트 진행)
-      - run: uv run --locked python -m training.train_sklearn
-      - run: uv run --locked python -m training.validate_model sklearn
+      - run: uv run --locked --group train python -m training.train_sklearn
+      - run: uv run --locked --group train python -m training.validate_model sklearn
       - run: uv run --locked --group train python -m training.train_dl
       - run: uv run --locked --group train python -m training.validate_model dl
       - run: uv run --locked --group train python -m training.export_onnx # onnx 예측기 검사에 변환 파일이 필요하다
@@ -36,9 +36,9 @@ jobs:
       # 학습 라이브러리(scikit-learn, torch)는 pyproject.toml 의 train 그룹. 로컬과 같은 명령이다.
       - run: mkdir -p artifacts # 커밋하지 않는 폴더라 새 checkout 에는 없다
       - run: uv run --locked --group train python -m training.train_sklearn
-      - run: uv run --locked python -m training.validate_model sklearn # 실패하면 여기서 중단 → 배포 안 됨
+      - run: uv run --locked --group train python -m training.validate_model sklearn # 실패하면 여기서 중단 → 배포 안 됨
       - run: uv run --locked --group train python -m training.train_dl
-      - run: uv run --locked python -m training.validate_model dl
+      - run: uv run --locked --group train python -m training.validate_model dl
       - run: uv run --locked --group train python -m training.export_onnx # 원본 vs ONNX 예측 일치 확인 포함
       - uses: actions/upload-artifact@v7
         with:
