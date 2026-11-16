@@ -24,8 +24,27 @@ jobs:
       # uv.lock 그대로 설치 후 실행 (로컬·VS Code 와 같은 설정). dl 예측기 검사에 torch가 필요해 train 그룹을 켠다
       - run: uv run --locked --group train pytest -q
 
-  image: # ── 배포: 테스트를 통과하면 이미지 빌드·푸시 ────────
+  train: # ── MLOps 2단계: 재현 가능한 학습 + 모델 검증 게이트 ──
     needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      # 학습 라이브러리(scikit-learn, torch)는 pyproject.toml 의 train 그룹. 로컬과 같은 명령이다.
+      - run: mkdir -p artifacts # 커밋하지 않는 폴더라 새 checkout 에는 없다
+      - run: uv run --locked --group train python -m training.train_sklearn
+      - run: uv run --locked python -m training.validate_model sklearn # 실패하면 여기서 중단 → 배포 안 됨
+      - run: uv run --locked --group train python -m training.train_dl
+      - run: uv run --locked python -m training.validate_model dl
+      - uses: actions/upload-artifact@v7
+        with:
+          name: model-artifacts
+          path: artifacts/
+
+  image: # ── 배포: 학습 게이트를 통과하면 이미지 빌드·푸시 ────────
+    needs: train
     if: startsWith(github.ref, 'refs/tags/v') # v 로 시작하는 태그를 푸시했을 때만 이미지 배포
     runs-on: ubuntu-latest
     steps:
