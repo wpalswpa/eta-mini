@@ -45,12 +45,48 @@ jobs:
           name: model-artifacts
           path: artifacts/
 
-  image: # ── 배포: 학습 게이트를 통과하면 이미지 빌드·푸시 ────────
+  parity: # ── Go·Rust 서비스가 Python API 와 같은 예측을 내는지 확인 ──
     needs: train
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: model-artifacts
+          path: artifacts/
+      - run: docker build -f api-go/Dockerfile -t eta-go .
+      - run: docker build -f api-rust/Dockerfile -t eta-rust .
+      - run: |
+          docker run -d --name eta-go -p 8081:8080 eta-go
+          docker run -d --name eta-rust -p 8082:8080 eta-rust
+      # 기준은 학습한 원본 모델(sklearn)로 띄운 Python API. scikit-learn 은 train 그룹에 있다
+      - run: MODEL_IMPL=sklearn nohup uv run --locked --group train uvicorn api.app:app --port 8080 > python-api.log 2>&1 &
+      - name: 서버 준비 대기
+        run: |
+          for port in 8080 8081 8082; do
+            curl --retry 30 --retry-delay 1 --retry-connrefused -fsS "http://127.0.0.1:${port}/health"
+            echo
+          done
+      - run: uv run --locked python -m training.check_parity # 하나라도 FAIL 이면 실패 → image 작업이 돌지 않는다
+      - if: failure()
+        run: |
+          docker logs eta-go || true
+          docker logs eta-rust || true
+          cat python-api.log || true
+
+  image: # ── 배포: parity 를 통과하면 이미지 세 개 빌드·푸시 ────────
+    needs: parity
     if: startsWith(github.ref, 'refs/tags/v') # v 로 시작하는 태그를 푸시했을 때만 이미지 배포
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: model-artifacts
+          path: artifacts/
       - name: 이미지 이름 (소문자)
         run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
       - uses: docker/setup-buildx-action@v4
@@ -59,15 +95,56 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v7
+
+      - name: Python API (구현체를 rule → onnx 로 교체, scikit-learn 없이 서빙)
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: api/Dockerfile
           push: true
-          build-args: MODEL_IMPL=rule
+          build-args: MODEL_IMPL=onnx
           tags: |
             ${{ env.IMAGE }}/eta-api:${{ github.ref_name }}
             ${{ env.IMAGE }}/eta-api:latest
+
+      - name: Go 서비스
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: api-go/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}/eta-go:${{ github.ref_name }}
+            ${{ env.IMAGE }}/eta-go:latest
+
+      - name: Rust 서비스
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: api-rust/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}/eta-rust:${{ github.ref_name }}
+            ${{ env.IMAGE }}/eta-rust:latest
+
+  release: # ── 배포: 태그의 모델 파일을 GitHub Release 로 공개 ────────
+    needs: image
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Release 를 만들려면 필요하다. 이 작업만 받는다
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: model-artifacts
+          path: artifacts/
+      - name: Release 를 만들고 모델 파일 올리기
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          gh release create "$GITHUB_REF_NAME"
+          artifacts/model_*.onnx artifacts/metrics_*.json
+          --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
 
   deploy: # ── 배포: Render 에 새 이미지 배포 요청 ────────
     needs: image
