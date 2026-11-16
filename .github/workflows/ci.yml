@@ -21,6 +21,7 @@ jobs:
       - run: uv run --locked python -m training.validate_model sklearn
       - run: uv run --locked --group train python -m training.train_dl
       - run: uv run --locked --group train python -m training.validate_model dl
+      - run: uv run --locked --group train python -m training.export_onnx # onnx 예측기 검사에 변환 파일이 필요하다
       # uv.lock 그대로 설치 후 실행 (로컬·VS Code 와 같은 설정). dl 예측기 검사에 torch가 필요해 train 그룹을 켠다
       - run: uv run --locked --group train pytest -q
 
