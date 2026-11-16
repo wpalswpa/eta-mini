@@ -234,3 +234,18 @@ def test_model_impl_unknown_name_fails_at_startup(load_app):
     """R6: 없는 예측기 이름이면 요청 시점이 아니라 서버를 띄울 때 실패한다."""
     with pytest.raises(ModuleNotFoundError, match="api.predictors.does_not_exist"):
         load_app("does_not_exist")
+
+
+def test_eta_with_sklearn_model(load_app):
+    """R19: MODEL_IMPL=sklearn 예측기가 3km·2건에 약 28.94분을 돌려주고 model='sklearn'을 응답한다."""
+    client = TestClient(load_app("sklearn").app)
+
+    eta = client.post("/eta", json={"distance_km": 3.0, "pending_orders": 2})
+    health = client.get("/health")
+
+    assert health.json() == {"status": "ok", "model": "sklearn"}
+    assert eta.status_code == 200
+    data = eta.json()
+    assert data["model"] == "sklearn"
+    assert data["minutes"] == pytest.approx(28.94072, rel=1e-3)
+

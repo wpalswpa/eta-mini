@@ -4,8 +4,8 @@
 
 ## 현재 상태
 
-- 된 것: 규칙 예측기, API 두 개(`POST /eta`, `GET /health`), 서버 주소(`/`)의 소개 페이지, 계약 테스트, 컨테이너 이미지(빌드, 컨테이너 안 테스트, 서버 응답 확인), GitHub Actions 자동 테스트(`main`에 올릴 때 실행), Render 배포(https://eta-api-fcvw.onrender.com).
-- 안 된 것: Render 자동 배포 연동, 학습 모델.
+- 된 것: 규칙 예측기(`rule`), scikit-learn 예측기(`sklearn`), API 두 개(`POST /eta`, `GET /health`), 서버 주소(`/`)의 소개 페이지, 계약 테스트, 모델 학습 파이프라인(`training/data.py`, `training/train_sklearn.py`), 검증 게이트(`training/validate_model.py`), 컨테이너 이미지(빌드, 컨테이너 안 테스트, 서버 응답 확인), GitHub Actions 자동 테스트 및 Render CD 연동 배포 정의(`.github/workflows/ci.yml`), Render 배포(https://eta-api-fcvw.onrender.com).
+- 안 된 것: 딥러닝 구현체(`dl`), ONNX 변환 및 Go/Rust 서빙, 운영 지표 모니터링.
 
 ## 읽는 순서
 
@@ -20,7 +20,10 @@
 | 하는 일 | 명령 |
 |---|---|
 | 의존성 설치 | `uv sync --all-groups` |
-| 개발 서버 | `uv run uvicorn api.app:app --port 8080 --reload` |
+| scikit-learn 모델 학습 | `uv run python -m training.train_sklearn` |
+| 모델 검증 게이트 | `uv run python -m training.validate_model sklearn` |
+| 개발 서버 (규칙 예측기) | `uv run uvicorn api.app:app --port 8080 --reload` |
+| 개발 서버 (sklearn 예측기) | `MODEL_IMPL=sklearn uv run uvicorn api.app:app --port 8081 --reload` |
 | 테스트 | `uv run pytest -q` |
 | CI와 같은 테스트(잠금 파일 확인 포함) | `uv run --locked pytest -q` |
 | 이미지 빌드 | `docker build -f api/Dockerfile -t eta-api .` |
@@ -31,8 +34,13 @@
 서버를 띄운 뒤 예상 시간을 요청한다.
 
 ```bash
+# 규칙 예측기 (8080 포트): 기본 10 + 3*3 + 2*2 = 23.0분
 curl -X POST localhost:8080/eta -H 'Content-Type: application/json' -d '{"distance_km": 3, "pending_orders": 2}'
 # {"minutes":23.0,"model":"rule"}
+
+# sklearn 모델 예측기 (8081 포트): 실제 배달 공식에 근접한 약 28.94분
+curl -X POST localhost:8081/eta -H 'Content-Type: application/json' -d '{"distance_km": 3, "pending_orders": 2}'
+# {"minutes":28.94072198442544,"model":"sklearn"}
 ```
 
 컨테이너 안 테스트는 실행할 때 개발 의존성(pytest 등)을 내려받으므로 네트워크가 필요하다.
@@ -44,16 +52,23 @@ GitHub에 올리면 `.github/workflows/ci.yml`이 테스트를 돌린다. PR을 
 ## 파일 구조
 
 ```text
-.github/workflows/ci.yml  GitHub Actions 테스트와 이미지 배포
+.github/workflows/ci.yml  GitHub Actions 테스트, 이미지 빌드 및 Render CD 배포
 api/
-  app.py               API 정의와 입력 검증
-  index.html           서버 주소(`/`)의 소개 페이지
-  predictors/rule.py   규칙 예측기(이후 모델이 넘어야 할 기준선)
-  tests/               계약 테스트(pytest)
-  Dockerfile           컨테이너 이미지 정의
-.dockerignore          이미지 빌드에 보내지 않을 파일
-pyproject.toml         의존성과 pytest 설정
-uv.lock                고정된 의존성 판
-설계서.md              계약과 결정의 정본
-AGENTS.md              AI 작업 규칙(CLAUDE.md는 이 파일을 불러온다)
+  app.py                  API 정의와 입력 검증
+  index.html              서버 주소(`/`)의 소개 페이지
+  predictors/
+    rule.py               규칙 기반 예측기 (기준선 baseline)
+    sklearn.py            scikit-learn 기반 학습 모델 예측기
+  tests/                  계약 테스트 (pytest)
+  Dockerfile              컨테이너 이미지 정의
+training/
+  data.py                 재현 가능한 배달 데이터 생성 (collect_data)
+  train_sklearn.py        scikit-learn 회귀 모델 학습 파이프라인
+  validate_model.py       모델 검증 게이트 (기준선 비교 및 절대 상한 검증)
+artifacts/                학습 산출물 (joblib 모델, 메트릭 json - .gitignore)
+.dockerignore             이미지 빌드에 보내지 않을 파일
+pyproject.toml            의존성과 pytest 설정
+uv.lock                   고정된 의존성 판
+설계서.md                 계약과 결정의 정본
+AGENTS.md                 AI 작업 규칙(CLAUDE.md는 이 파일을 불러온다)
 ```

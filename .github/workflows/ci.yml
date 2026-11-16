@@ -16,6 +16,9 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+      # 모델 학습 및 검증 게이트 (산출물 artifacts/ 생성 후 테스트 진행)
+      - run: uv run --locked python -m training.train_sklearn
+      - run: uv run --locked python -m training.validate_model sklearn
       # uv.lock 그대로 설치 후 실행 (로컬·VS Code 와 같은 설정)
       - run: uv run --locked pytest -q
 
@@ -42,3 +45,21 @@ jobs:
           tags: |
             ${{ env.IMAGE }}/eta-api:${{ github.ref_name }}
             ${{ env.IMAGE }}/eta-api:latest
+
+  deploy: # ── 배포: Render 에 새 이미지 배포 요청 ────────
+    needs: image
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Render 배포 요청
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL 이 설정되지 않아 건너뜁니다"
+            exit 0
+          fi
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}/eta-api:${GITHUB_REF_NAME}"
+          IMG_URL=$(jq -rn --arg v "$IMAGE" '$v|@uri')
+          curl -fsS -X POST "${DEPLOY_HOOK}&imgURL=${IMG_URL}"
+
