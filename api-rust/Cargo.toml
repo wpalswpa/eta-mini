@@ -1,0 +1,15 @@
+[package]
+name = "eta-api-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+# arbitrary_precision: 숫자를 읽은 글자 그대로 보존한다(2.0 과 2 를 구분, 1e309 를 오류 없이 읽음)
+serde_json = { version = "1", features = ["arbitrary_precision"] }
+# load-dynamic: ONNX Runtime 공유 라이브러리를 실행할 때 ORT_LIB 경로에서 읽는다. download-binaries 는 끈다.
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "load-dynamic"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
