@@ -33,6 +33,12 @@
 | 컨테이너 안에서 테스트 | `docker run --rm eta-api uv run pytest` |
 | 이미지 안 파일 확인 | `docker run --rm eta-api sh -c 'find . \| grep -v .venv'` |
 | 컨테이너로 서버 실행 | `docker run --rm --publish 8080:8080 eta-api` |
+| Go 서비스 이미지 빌드(먼저 학습·ONNX 변환) | `docker build -f api-go/Dockerfile -t eta-api-go .` |
+| Go 서비스 실행 | `docker run --rm --publish 8081:8080 eta-api-go` |
+| Go 서비스만 예측 일치 비교 | `TARGETS=go=http://127.0.0.1:8081 uv run python -m training.check_parity` |
+| Rust 서비스 이미지 빌드(먼저 학습·ONNX 변환) | `docker build -f api-rust/Dockerfile -t eta-api-rust .` |
+| Rust 서비스 실행 | `docker run --rm --publish 8082:8080 eta-api-rust` |
+| Python API와 예측 일치 비교(Python API는 `MODEL_IMPL=sklearn`, 8080) | `uv run python -m training.check_parity` |
 
 서버를 띄운 뒤 예상 시간을 요청한다.
 
@@ -65,6 +71,8 @@ api/
     dl.py                 PyTorch 기반 학습 모델 예측기(torch는 train 그룹)
   tests/                  계약 테스트 (pytest)
   Dockerfile              컨테이너 이미지 정의
+api-go/                   Go 서비스(ONNX Runtime): 같은 API 계약, ONNX 모델 서빙. Dockerfile 포함
+api-rust/                 Rust 서비스(axum, ort): 같은 API 계약, ONNX 모델 서빙. Dockerfile 포함
 training/
   data.py                 재현 가능한 배달 데이터 생성 (collect_data)
   train_sklearn.py        scikit-learn 회귀 모델 학습 파이프라인
