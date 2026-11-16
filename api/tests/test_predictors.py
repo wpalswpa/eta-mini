@@ -44,6 +44,8 @@ def test_predictor_discovery_finds_rule():
 @pytest.mark.parametrize(("distance_km", "pending_orders"), [(0.0, 0), (2.5, 3), (20.0, 50)])
 def test_every_predictor_returns_finite_non_negative_minutes(name, distance_km, pending_orders):
     """R2: 모든 예측기가 같은 함수 이름·인자 순서를 쓰고, 계약 범위 입력에 유한한 0 이상 분을 돌려준다."""
+    if name == "dl":
+        pytest.importorskip("torch", reason="torch는 train 그룹에만 있다(설계서 4.3)")
     predictor = importlib.import_module(f"api.predictors.{name}")
 
     minutes = predictor.estimate_delivery_minutes(distance_km, pending_orders)

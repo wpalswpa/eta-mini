@@ -22,6 +22,9 @@
 | 의존성 설치 | `uv sync --all-groups` |
 | scikit-learn 모델 학습 | `uv run python -m training.train_sklearn` |
 | 모델 검증 게이트 | `uv run python -m training.validate_model sklearn` |
+| PyTorch 모델 학습(train 그룹, CPU 전용 torch) | `uv run --group train python -m training.train_dl` |
+| PyTorch 모델 검증 게이트 | `uv run --group train python -m training.validate_model dl` |
+| 테스트(dl 포함) | `uv run --group train pytest -q` |
 | 개발 서버 (규칙 예측기) | `uv run uvicorn api.app:app --port 8080 --reload` |
 | 개발 서버 (sklearn 예측기) | `MODEL_IMPL=sklearn uv run uvicorn api.app:app --port 8081 --reload` |
 | 테스트 | `uv run pytest -q` |
@@ -59,11 +62,13 @@ api/
   predictors/
     rule.py               규칙 기반 예측기 (기준선 baseline)
     sklearn.py            scikit-learn 기반 학습 모델 예측기
+    dl.py                 PyTorch 기반 학습 모델 예측기(torch는 train 그룹)
   tests/                  계약 테스트 (pytest)
   Dockerfile              컨테이너 이미지 정의
 training/
   data.py                 재현 가능한 배달 데이터 생성 (collect_data)
   train_sklearn.py        scikit-learn 회귀 모델 학습 파이프라인
+  train_dl.py             PyTorch 회귀 모델 학습(하이퍼파라미터를 지표 파일에 기록)
   validate_model.py       모델 검증 게이트 (기준선 비교 및 절대 상한 검증)
 artifacts/                학습 산출물 (joblib 모델, 메트릭 json - .gitignore)
 .dockerignore             이미지 빌드에 보내지 않을 파일
